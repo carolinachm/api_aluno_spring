@@ -4,8 +4,8 @@ import br.com.carolinamesquita.api_alunos.model.AlunoModel;
 import br.com.carolinamesquita.api_alunos.repository.AlunoRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -22,7 +22,6 @@ public class AlunoService extends GenericService<AlunoModel> {
         return alunoRepository;
     }
 
-    // Copia os campos específicos de Aluno
     @Override
     protected void copiarDados(AlunoModel origem, AlunoModel destino) {
         destino.setNome(origem.getNome());
@@ -31,17 +30,52 @@ public class AlunoService extends GenericService<AlunoModel> {
     }
 
     // ==============================================
-    // 🎓 MÉTODOS ESPECÍFICOS DE ALUNO
+    // MÉTODOS DO GenericService (disponíveis aqui)
     // ==============================================
 
+    @Override
     public AlunoModel salvar(AlunoModel aluno) {
         validar(aluno);
         return super.salvar(aluno);
     }
 
+    @Override
+    public List<AlunoModel> listarTodos() {
+        return super.listarTodos();
+    }
+
+    @Override
+    public Optional<AlunoModel> buscarPorId(UUID id) {
+        return super.buscarPorId(id);
+    }
+
+    @Override
+    public AlunoModel atualizar(UUID id, AlunoModel dadosAtualizados) {
+        return super.atualizar(id, dadosAtualizados);
+    }
+
+    @Override
+    public void excluir(UUID id) {
+        super.excluir(id);
+    }
+
+    @Override
+    public boolean existe(UUID id) {
+        return super.existe(id);
+    }
+
+    @Override
+    public long contar() {
+        return super.contar();
+    }
+
+    // ==============================================
+    // 🎓 MÉTODOS ESPECÍFICOS DE ALUNO
+    // ==============================================
+
     public Double calcularMedia(UUID codigo) {
         AlunoModel aluno = buscarPorId(codigo)
-            .orElseThrow(() -> new RuntimeException("Aluno não encontrado"));
+                .orElseThrow(() -> new RuntimeException("Aluno não encontrado"));
         
         if (aluno.getNota1() == null || aluno.getNota2() == null) {
             throw new IllegalStateException("Notas incompletas para cálculo da média");
@@ -56,10 +90,10 @@ public class AlunoService extends GenericService<AlunoModel> {
 
     public List<AlunoModel> listarAprovados() {
         return alunoRepository.findAll()
-            .stream()
-            .filter(a -> a.getNota1() != null && a.getNota2() != null)
-            .filter(a -> (a.getNota1() + a.getNota2()) / 2 >= 6.0)
-            .toList();
+                .stream()
+                .filter(a -> a.getNota1() != null && a.getNota2() != null)
+                .filter(a -> (a.getNota1() + a.getNota2()) / 2 >= 6.0)
+                .toList();
     }
 
     private void validar(AlunoModel aluno) {

@@ -2,10 +2,13 @@ package br.com.carolinamesquita.api_alunos.controller;
 
 import br.com.carolinamesquita.api_alunos.model.AlunoModel;
 import br.com.carolinamesquita.api_alunos.service.AlunoService;
+import br.com.carolinamesquita.api_alunos.service.GenericService;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,7 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/alunos")
 @CrossOrigin(origins = "*")
-public class AlunoController {
+public class AlunoController extends GenericController<AlunoModel> {
 
     private final AlunoService alunoService;
 
@@ -21,21 +24,29 @@ public class AlunoController {
         this.alunoService = alunoService;
     }
 
-    // ==============================================
-    // CRUD — MESMO PADRÃO DO GenericController
-    // ==============================================
-
-    @PostMapping
-    public ResponseEntity<?> criar(@RequestBody AlunoModel entidade) {
-        try {
-            AlunoModel salvo = alunoService.salvar(entidade);
-            return ResponseEntity.status(HttpStatus.CREATED).body(salvo);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    @Override
+    protected GenericService<AlunoModel> getService() {
+        return alunoService;
     }
 
-    @GetMapping
+    // ==============================================
+    //  CRUD — TODOS os métodos, COMPLETOS
+    // ==============================================
+
+    @PostMapping("/cadastrar")
+    public ResponseEntity<?> criar(@RequestBody AlunoModel aluno) {
+        if (aluno.getNome() == null || aluno.getNome().isEmpty()) {
+            return ResponseEntity.badRequest().body("Informe um nome válido");
+        }
+        if (aluno.getNota1() < 0 || aluno.getNota1() > 10 || aluno.getNota2() < 0 || aluno.getNota2() > 10) {
+            return ResponseEntity.badRequest().body("Verifique as notas");
+        }
+        AlunoModel novoAluno = alunoService.salvar(aluno);
+        URI uri = URI.create("/api/alunos/" + novoAluno.getCodigo());
+        return ResponseEntity.created(uri).body(novoAluno);
+    }
+
+    @GetMapping("/listar")
     public ResponseEntity<List<AlunoModel>> listarTodos() {
         return ResponseEntity.ok(alunoService.listarTodos());
     }
@@ -52,24 +63,29 @@ public class AlunoController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(mensagem);
     }
 
-    @PutMapping("/{codigo}")
-    public ResponseEntity<?> atualizar(@PathVariable UUID codigo, @RequestBody AlunoModel entidade) throws IllegalArgumentException {
-        try {
-            AlunoModel atualizado = alunoService.atualizar(codigo, entidade);
-            return ResponseEntity.ok(atualizado);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    @PutMapping("/atualizar/{codigo}")
+    public ResponseEntity<?> alterar(@PathVariable UUID codigo, @RequestBody AlunoModel aluno) {
+        if (!alunoService.existe(codigo)) {
+            return ResponseEntity.notFound().build();
         }
+        if (aluno.getNome() == null || aluno.getNome().isEmpty()) {
+            return ResponseEntity.badRequest().body("Informe um nome válido");
+        }
+        if (aluno.getNota1() < 0 || aluno.getNota1() > 10 || aluno.getNota2() < 0 || aluno.getNota2() > 10) {
+            return ResponseEntity.badRequest().body("Verifique as notas");
+        }
+        aluno.setCodigo(codigo);
+        AlunoModel atualizado = alunoService.atualizar(codigo, aluno);
+        return ResponseEntity.ok(atualizado);
     }
 
-    @DeleteMapping("/{codigo}")
-    public ResponseEntity<?> excluir(@PathVariable UUID codigo) {
-        try {
-            alunoService.excluir(codigo);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    @DeleteMapping("/remover/{codigo}")
+    public ResponseEntity<?> remover(@PathVariable UUID codigo) {
+        if (!alunoService.existe(codigo)) {
+            return ResponseEntity.notFound().build();
         }
+        alunoService.excluir(codigo);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{codigo}/existe")
@@ -83,17 +99,15 @@ public class AlunoController {
     }
 
     // ==============================================
-    // MÉTODOS ESPECÍFICOS DE ALUNO
+    // 🎓 MÉTODOS ESPECÍFICOS — COMPLETOS
     // ==============================================
 
     @GetMapping("/{codigo}/media")
     public ResponseEntity<?> calcularMedia(@PathVariable UUID codigo) {
         Double media = alunoService.calcularMedia(codigo);
-        
         if (media != null) {
             return ResponseEntity.ok(media);
         }
-        
         String mensagem = "Aluno com código " + codigo + " não encontrado";
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(mensagem);
     }
@@ -101,11 +115,9 @@ public class AlunoController {
     @GetMapping("/{codigo}/aprovado")
     public ResponseEntity<?> verificarAprovacao(@PathVariable UUID codigo) {
         Boolean aprovado = alunoService.estaAprovado(codigo);
-        
         if (aprovado != null) {
             return ResponseEntity.ok(aprovado);
         }
-        
         String mensagem = "Aluno com código " + codigo + " não encontrado";
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(mensagem);
     }

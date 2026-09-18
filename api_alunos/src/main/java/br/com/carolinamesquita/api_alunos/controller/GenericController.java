@@ -1,77 +1,81 @@
 package br.com.carolinamesquita.api_alunos.controller;
 
 import br.com.carolinamesquita.api_alunos.service.GenericService;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public abstract class GenericController<T> {
 
-    private final GenericService<T> service;
-
-    protected GenericController(GenericService<T> service) {
-        this.service = service;
-    }
-
-    @PostMapping
-    public ResponseEntity<?> criar(@RequestBody T entidade) {
+    protected abstract GenericService<T> getService();
+    
+    protected UUID getCodigo(T entidade) {
         try {
-            T salvo = service.salvar(entidade);
-            return ResponseEntity.status(HttpStatus.CREATED).body(salvo);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return (UUID) entidade.getClass().getMethod("getCodigo").invoke(entidade);
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao obter o código", e);
+        }
+    }
+    
+    protected void setCodigo(T entidade, UUID codigo) {
+        try {
+            entidade.getClass().getMethod("setCodigo", UUID.class).invoke(entidade, codigo);
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao definir o código", e);
         }
     }
 
-    @GetMapping
-    public ResponseEntity<List<T>> listarTodos() {
-        return ResponseEntity.ok(service.listarTodos());
+    // REMOVEMOS @PostMapping, @PutMapping, etc. daqui
+    // Apenas a lógica, sem mapeamento de rota
+    protected ResponseEntity<?> criarInterno(T entidade) {
+        T novaEntidade = getService().salvar(entidade);
+        URI uri = URI.create("/api/" + getNomeRecurso() + "/" + getCodigo(novaEntidade));
+        return ResponseEntity.created(uri).body(novaEntidade);
     }
 
-    // ✅ Sem orElse — forma clara e direta
-    @GetMapping("/{codigo}")
-    public ResponseEntity<?> buscarPorId(@PathVariable UUID codigo) {
-        Optional<T> resultado = service.buscarPorId(codigo);
-        
+    protected ResponseEntity<List<T>> listarTodosInterno() {
+        return ResponseEntity.ok(getService().listarTodos());
+    }
+
+    protected ResponseEntity<?> buscarPorIdInterno(UUID codigo) {
+        Optional<T> resultado = getService().buscarPorId(codigo);
         if (resultado.isPresent()) {
             return ResponseEntity.ok(resultado.get());
         }
-        
-        String mensagem = "Registro com código " + codigo + " não encontrado";
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(mensagem);
+        return ResponseEntity.notFound().build();
     }
 
-    @PutMapping("/{codigo}")
-    public ResponseEntity<?> atualizar(@PathVariable UUID codigo, @RequestBody T entidade) throws IllegalArgumentException {
-        try {
-            T atualizado = service.atualizar(codigo, entidade);
-            return ResponseEntity.ok(atualizado);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    protected ResponseEntity<?> alterarInterno(UUID codigo, T entidade) {
+        if (!getService().existe(codigo)) {
+            return ResponseEntity.notFound().build();
         }
+        setCodigo(entidade, codigo);
+        return ResponseEntity.ok(getService().atualizar(codigo, entidade));
     }
 
-    @DeleteMapping("/{codigo}")
-    public ResponseEntity<?> excluir(@PathVariable UUID codigo) {
-        try {
-            service.excluir(codigo);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    protected ResponseEntity<?> removerInterno(UUID codigo) {
+        if (!getService().existe(codigo)) {
+            return ResponseEntity.notFound().build();
         }
+        getService().excluir(codigo);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{codigo}/existe")
     public ResponseEntity<Boolean> existe(@PathVariable UUID codigo) {
-        return ResponseEntity.ok(service.existe(codigo));
+        return ResponseEntity.ok(getService().existe(codigo));
     }
 
     @GetMapping("/contar")
     public ResponseEntity<Long> contar() {
-        return ResponseEntity.ok(service.contar());
+        return ResponseEntity.ok(getService().contar());
+    }
+
+    private String getNomeRecurso() {
+        return this.getClass().getSimpleName().replace("Controller", "").toLowerCase() + "s";
     }
 }
